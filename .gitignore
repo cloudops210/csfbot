@@ -1,0 +1,13 @@
+# Backend
+Trading-Platform-Backend/node_modules/
+Trading-Platform-Backend/.env
+
+# Frontend
+Trading-Platform-Frontend/node_modules/
+Trading-Platform-Frontend/.env
+Trading-Platform-Frontend/.next
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
