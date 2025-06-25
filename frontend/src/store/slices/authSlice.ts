@@ -1,10 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const SERVER_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import api from '@/lib/api';
 
 interface AuthState {
-  user: { email: string; name?: string } | null;
+  user: {
+    email: string;
+    name?: string;
+    subscriptionStatus?: string;
+    subscriptionPlan?: string;
+    hasPassword?: boolean;
+  } | null;
   token: string | null;
   loading: boolean;
   error: string | null;
@@ -15,7 +19,7 @@ interface AuthState {
 
 const initialState: AuthState = {
   user: null,
-  token: null,
+  token: typeof window !== 'undefined' ? localStorage.getItem('token') : null,
   loading: false,
   error: null,
   verifySuccess: null,
@@ -27,7 +31,7 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (data: { email: string; password: string }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${SERVER_URL}/api/auth/login`, data);
+      const res = await api.post('/api/auth/login', data);
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Login failed');
@@ -39,7 +43,7 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async (data: { email: string; password: string; name?: string }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${SERVER_URL}/api/auth/register`, data);
+      const res = await api.post('/api/auth/register', data);
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Registration failed');
@@ -51,7 +55,7 @@ export const verifyEmail = createAsyncThunk(
   'auth/verifyEmail',
   async (data: { email: string; token: string }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${SERVER_URL}/api/auth/verify-email`, data);
+      const res = await api.post('/api/auth/verify-email', data);
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Verification failed');
@@ -63,7 +67,7 @@ export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
   async (data: { email: string; token: string; newPassword: string }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${SERVER_URL}/api/auth/reset-password`, data);
+      const res = await api.post('/api/auth/reset-password', data);
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Reset failed');
@@ -75,7 +79,7 @@ export const forgotPassword = createAsyncThunk(
   'auth/forgotPassword',
   async (data: { email: string }, { rejectWithValue }) => {
     try {
-      const res = await axios.post(`${SERVER_URL}/api/auth/forgot-password`, data);
+      const res = await api.post('/api/auth/forgot-password', data);
       return res.data;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || 'Request failed');
@@ -83,22 +87,60 @@ export const forgotPassword = createAsyncThunk(
   }
 );
 
+export const googleLogin = createAsyncThunk(
+  'auth/googleLogin',
+  async (token: string, { dispatch, rejectWithValue }) => {
+    try {
+      localStorage.setItem('token', token);
+      dispatch(setToken(token));
+      const res = await api.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.data.user;
+    } catch (err: any) {
+      localStorage.removeItem('token');
+      return rejectWithValue(err.response?.data?.message || 'Google login failed.');
+    }
+  }
+);
+
 export const loginWithToken = (token: string) => async (dispatch: any) => {
   try {
-    // Store token (in Redux and localStorage)
     dispatch(setToken(token));
-    localStorage.setItem("token", token);
-
-    // Optionally, fetch user info
-    const res = await axios.get(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/auth/me`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    localStorage.setItem('token', token);
+    const res = await api.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     dispatch(setUser(res.data.user));
   } catch (err) {
     dispatch(logout());
   }
 };
+
+export const updateProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (data: { name?: string; email?: string }, { rejectWithValue }) => {
+    try {
+      await api.put('/api/auth/profile', data);
+      const res = await api.get('/api/auth/me');
+      return res.data.user;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Profile update failed');
+    }
+  }
+);
+
+export const changePassword = createAsyncThunk(
+  'auth/changePassword',
+  async (data: { currentPassword: string; newPassword: string }, { rejectWithValue }) => {
+    try {
+      const res = await api.put('/api/auth/change-password', data);
+      return res.data.message;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || 'Password change failed');
+    }
+  }
+);
 
 const authSlice = createSlice({
   name: 'auth',
@@ -126,6 +168,12 @@ const authSlice = createSlice({
     },
     setUser(state, action) {
       state.user = action.payload;
+    },
+    clearProfileState(state) {
+      state.error = null;
+    },
+    clearPasswordState(state) {
+      state.error = null;
     },
   },
   extraReducers: (builder) => {
@@ -195,9 +243,45 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload as string;
         state.forgotSuccess = null;
+      })
+      .addCase(updateProfile.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateProfile.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+      })
+      .addCase(updateProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(changePassword.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(changePassword.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(changePassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(googleLogin.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(googleLogin.fulfilled, (state, action) => {
+        state.loading = false;
+        state.user = action.payload;
+      })
+      .addCase(googleLogin.rejected, (state, action) => {
+        state.loading = false;
+        state.token = null;
+        state.error = action.payload as string;
       });
   },
 });
 
-export const { logout, clearVerifyState, clearResetState, clearForgotState, setToken, setUser } = authSlice.actions;
+export const { logout, clearVerifyState, clearResetState, clearForgotState, setToken, setUser, clearProfileState, clearPasswordState } = authSlice.actions;
 export default authSlice.reducer;

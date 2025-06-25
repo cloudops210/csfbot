@@ -1,7 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const SERVER_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+import api from '@/lib/api';
 
 interface ApiKey {
   _id: string;
@@ -23,13 +21,9 @@ const initialState: ApiKeyState = {
 };
 
 // Async thunk for getting API keys
-export const getApiKeys = createAsyncThunk('apiKeys/getApiKeys', async (_, { getState, rejectWithValue }) => {
+export const getApiKeys = createAsyncThunk('apiKeys/getApiKeys', async (_, { rejectWithValue }) => {
   try {
-    const token = (getState() as any).auth.token;
-    const config = {
-      headers: { Authorization: `Bearer ${token}` },
-    };
-    const response = await axios.get(`${SERVER_URL}/api/keys`, config);
+    const response = await api.get('/api/keys');
     return response.data;
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || 'Failed to fetch API keys');
@@ -39,14 +33,10 @@ export const getApiKeys = createAsyncThunk('apiKeys/getApiKeys', async (_, { get
 // Async thunk for adding an API key
 export const addApiKey = createAsyncThunk(
   'apiKeys/addApiKey',
-  async ({ exchange, apiKey, apiSecret }: { exchange: string; apiKey: string; apiSecret: string }, { getState, rejectWithValue }) => {
+  async ({ exchange, apiKey, apiSecret }: { exchange: string; apiKey: string; apiSecret: string }, { rejectWithValue }) => {
     try {
-      const token = (getState() as any).auth.token;
-      const config = {
-        headers: { Authorization: `Bearer ${token}` },
-      };
       const body = { exchange, apiKey, apiSecret };
-      const response = await axios.post(`${SERVER_URL}/api/keys`, body, config);
+      const response = await api.post('/api/keys', body);
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to add API key');
@@ -55,13 +45,9 @@ export const addApiKey = createAsyncThunk(
 );
 
 // Async thunk for deleting an API key
-export const deleteApiKey = createAsyncThunk('apiKeys/deleteApiKey', async (keyId: string, { getState, rejectWithValue }) => {
+export const deleteApiKey = createAsyncThunk('apiKeys/deleteApiKey', async (keyId: string, { rejectWithValue }) => {
   try {
-    const token = (getState() as any).auth.token;
-    const config = {
-      headers: { Authorization: `Bearer ${token}` },
-    };
-    await axios.delete(`${SERVER_URL}/api/keys/${keyId}`, config);
+    await api.delete(`/api/keys/${keyId}`);
     return keyId;
   } catch (error: any) {
     return rejectWithValue(error.response?.data?.message || 'Failed to delete API key');

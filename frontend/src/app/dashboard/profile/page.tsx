@@ -1,90 +1,115 @@
 "use client";
-import { useSelector } from "react-redux";
-import { RootState } from "../../../store";
-import { useAuthGuard } from "../../../hooks/useAuthGuard";
+import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '@/store';
+import { setUser } from '@/store/slices/authSlice';
+import api from '@/lib/api';
 
 export default function ProfilePage() {
-  useAuthGuard();
-  const { user } = useSelector((state: RootState) => state.auth);
+  const dispatch = useDispatch();
+  const { user, token } = useSelector((state: RootState) => state.auth);
+
+  const [name, setName] = useState(user?.name || '');
+  const [email, setEmail] = useState(user?.email || '');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const [profileMessage, setProfileMessage] = useState('');
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+
+  console.log('user.hasPassword:', user?.hasPassword);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfileMessage('');
+    setProfileError('');
+    try {
+      const res = await api.put(
+        '/api/auth/profile',
+        { name, email }
+      );
+      dispatch(setUser(res.data.user));
+      setProfileMessage('Profile updated successfully!');
+    } catch (err: any) {
+      setProfileError(err.response?.data?.message || 'Failed to update profile.');
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+    setPasswordMessage('');
+    setPasswordError('');
+    try {
+      const payload: any = { newPassword };
+      if (user?.hasPassword) {
+        payload.currentPassword = currentPassword;
+      }
+      await api.put(
+        '/api/auth/change-password',
+        payload
+      );
+      setPasswordMessage('Password updated successfully!');
+      // Refresh user data to update hasPassword flag
+      const res = await api.get('/api/auth/me');
+      dispatch(setUser(res.data.user));
+      
+    } catch (err: any) {
+      setPasswordError(err.response?.data?.message || 'Failed to update password.');
+    }
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="max-w-4xl mx-auto py-12 px-4 space-y-12">
+      {/* Profile Update Form */}
+      <div className="bg-white rounded-xl shadow-lg p-8">
+        <h2 className="text-2xl font-bold mb-6">Profile Information</h2>
+        <form onSubmit={handleUpdateProfile} className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-black">Profile & Security</h1>
-        <p className="text-accent">Manage your account settings and security preferences.</p>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
+            <input type="text" id="name" value={name} onChange={(e) => setName(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+          </div>
+            <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+            <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
+          </div>
+          {profileMessage && <p className="text-green-600">{profileMessage}</p>}
+          {profileError && <p className="text-red-600">{profileError}</p>}
+          <button type="submit" className="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold">Save Changes</button>
+        </form>
       </div>
 
-      {/* Profile Information */}
-      <div className="bg-white rounded-xl shadow-subtle p-8 border border-border">
-        <h2 className="text-lg font-semibold text-black mb-6">Profile Information</h2>
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-black text-white flex items-center justify-center text-2xl font-bold">
-              {user?.name?.[0] || user?.email?.[0] || "U"}
-            </div>
+      {/* Password Change/Set Form */}
+      <div className="bg-white rounded-xl shadow-lg p-8">
+        <h2 className="text-2xl font-bold mb-6">{user?.hasPassword ? 'Change Password' : 'Set Password'}</h2>
+        {!user?.hasPassword && (
+          <p className="mb-4 text-sm text-gray-600">You signed up with a social provider. To enable logging in with a password, please set one below.</p>
+        )}
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          {user?.hasPassword && (
             <div>
-              <h3 className="text-lg font-semibold text-black">{user?.name || "User"}</h3>
-              <p className="text-accent">{user?.email || "user@example.com"}</p>
+              <label htmlFor="currentPassword"className="block text-sm font-medium text-gray-700">Current Password</label>
+              <input type="password" id="currentPassword" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
             </div>
+          )}
+            <div>
+            <label htmlFor="newPassword"className="block text-sm font-medium text-gray-700">New Password</label>
+            <input type="password" id="newPassword" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
             <div>
-              <label className="block text-sm font-medium text-black mb-2">Full Name</label>
-              <div className="px-3 py-2 bg-secondary rounded-md border border-border">
-                {user?.name || "Not provided"}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-black mb-2">Email Address</label>
-              <div className="px-3 py-2 bg-secondary rounded-md border border-border">
-                {user?.email || "Not provided"}
-              </div>
-            </div>
+            <label htmlFor="confirmPassword"className="block text-sm font-medium text-gray-700">Confirm New Password</label>
+            <input type="password" id="confirmPassword" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm" />
           </div>
-        </div>
-      </div>
-
-      {/* Security Settings */}
-      <div className="bg-white rounded-xl shadow-subtle p-8 border border-border">
-        <h2 className="text-lg font-semibold text-black mb-6">Security Settings</h2>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-secondary rounded-lg">
-            <div>
-              <h3 className="font-semibold text-black">Two-Factor Authentication</h3>
-              <p className="text-sm text-accent">Add an extra layer of security to your account</p>
-            </div>
-            <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-opacity-90 transition-all">
-              Enable 2FA
-            </button>
-          </div>
-          
-          <div className="flex items-center justify-between p-4 bg-secondary rounded-lg">
-            <div>
-              <h3 className="font-semibold text-black">Change Password</h3>
-              <p className="text-sm text-accent">Update your account password</p>
-            </div>
-            <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-opacity-90 transition-all">
-              Change Password
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Account Actions */}
-      <div className="bg-white rounded-xl shadow-subtle p-8 border border-border">
-        <h2 className="text-lg font-semibold text-black mb-6">Account Actions</h2>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div>
-              <h3 className="font-semibold text-red-800">Delete Account</h3>
-              <p className="text-sm text-red-600">Permanently delete your account and all data</p>
-            </div>
-            <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all">
-              Delete Account
-            </button>
-          </div>
-        </div>
+          {passwordMessage && <p className="text-green-600">{passwordMessage}</p>}
+          {passwordError && <p className="text-red-600">{passwordError}</p>}
+          <button type="submit" className="px-6 py-2 rounded-lg bg-blue-600 text-white font-semibold">{user?.hasPassword ? 'Change Password' : 'Set Password'}</button>
+        </form>
       </div>
     </div>
   );

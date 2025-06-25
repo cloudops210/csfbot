@@ -7,6 +7,9 @@ import {
   resetPassword,
   getMe,
   googleAuthCallback,
+  getUserTrades,
+  updateProfile,
+  changePassword,
 } from '../controllers/authController';
 import auth from '../middleware/auth';
 import passport from 'passport';
@@ -20,6 +23,9 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.get('/me', auth, getMe);
 
+// Trading history endpoint
+router.get('/trades', auth, getUserTrades);
+
 // Google OAuth routes
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 router.get(
@@ -29,5 +35,8 @@ router.get(
     googleAuthCallback(req, res).catch(next);
   }
 );
+
+router.put('/profile', auth, updateProfile);
+router.put('/change-password', auth, changePassword);
 
 export default router; 

@@ -12,6 +12,9 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
   googleId?: string;
+  subscriptionStatus?: string;
+  subscriptionPlan?: string;
+  stripeCustomerId?: string;
 }
 
 const UserSchema: Schema = new Schema<IUser>({
@@ -24,6 +27,9 @@ const UserSchema: Schema = new Schema<IUser>({
   twoFAEnabled: { type: Boolean, default: false },
   twoFASecret: { type: String },
   googleId: { type: String },
+  subscriptionStatus: { type: String, default: 'inactive' },
+  subscriptionPlan: { type: String, default: 'Free' },
+  stripeCustomerId: { type: String },
 }, {
   timestamps: true,
 });
